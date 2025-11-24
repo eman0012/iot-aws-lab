@@ -1,0 +1,55 @@
+name: Lambda Deployment
+
+on:
+  push:
+    branches: [main]
+    paths: ['lambda/**']
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ca-central-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build Lambda Packages
+        working-directory: lambda
+        run: |
+          chmod +x build_all.sh
+          ./build_all.sh
+
+      - name: Deploy Lambda Layer
+        working-directory: lambda
+        run: |
+          aws lambda publish-layer-version \
+            --layer-name iot-lab-shared \
+            --zip-file fileb://build/shared-layer.zip \
+            --compatible-runtimes python3.10 \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Update Lambda Functions
+        working-directory: lambda/build
+        run: |
+          for func in users devices telemetry conditions alertlogs admin; do
+            echo "Updating $func function..."
+            aws lambda update-function-code \
+              --function-name iot-lab-dev-$func \
+              --zip-file fileb://$func.zip \
+              --region ${{ env.AWS_REGION }}
+          done

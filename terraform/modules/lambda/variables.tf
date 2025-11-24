@@ -1,0 +1,10 @@
+variable "project_name" { type = string }
+variable "environment" { type = string }
+variable "vpc_id" { type = string }
+variable "private_subnet_ids" { type = list(string) }
+variable "secrets_arn" { type = string }
+variable "s3_bucket_name" { type = string }
+variable "s3_bucket_arn" { type = string }
+variable "rds_endpoint" { type = string }
+variable "rds_db_name" { type = string }
+variable "rabbitmq_endpoint" { type = string }

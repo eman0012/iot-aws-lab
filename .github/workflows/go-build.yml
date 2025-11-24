@@ -1,0 +1,43 @@
+name: Go CLI Build
+
+on:
+  push:
+    branches: [main]
+    paths: ['go-cli/**']
+  pull_request:
+    branches: [main]
+    paths: ['go-cli/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build
+        working-directory: go-cli
+        run: |
+          go mod download
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o iot-cli-linux ./cmd/
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o iot-cli-darwin ./cmd/
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o iot-cli.exe ./cmd/
+
+      - name: Test
+        working-directory: go-cli
+        run: go test ./... -v
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: iot-cli-binaries
+          path: |
+            go-cli/iot-cli-linux
+            go-cli/iot-cli-darwin
+            go-cli/iot-cli.exe
