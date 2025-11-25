@@ -40,7 +40,7 @@ resource "aws_security_group" "rabbitmq" {
 resource "aws_mq_broker" "rabbitmq" {
   broker_name        = "${var.project_name}-${var.environment}-rabbitmq"
   engine_type        = "RabbitMQ"
-  engine_version     = "3.11.20"
+  engine_version     = "3.13"
   host_instance_type = "mq.t3.micro"
   deployment_mode    = "SINGLE_INSTANCE"
 
