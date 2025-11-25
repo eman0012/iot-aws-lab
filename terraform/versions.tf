@@ -15,4 +15,12 @@ terraform {
       version = "~> 2.0"
     }
   }
+
+  backend "s3" {
+    bucket         = "iot-lab-terraform-state-537124935206"
+    key            = "terraform.tfstate"
+    region         = "ca-central-1"
+    dynamodb_table = "iot-lab-terraform-locks"
+    encrypt        = true
+  }
 }
