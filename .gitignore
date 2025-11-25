@@ -71,6 +71,7 @@ yarn-error.log*
 
 # Secrets (just in case)
 *secret*
+!terraform/modules/secrets/
 *password*
 *key*.pem
 *.key
