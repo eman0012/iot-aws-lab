@@ -59,3 +59,16 @@ output "ecs_cluster_name" {
 output "eks_cluster_name" {
   value = var.enable_eks ? module.eks[0].cluster_name : "EKS not enabled"
 }
+
+# ============================================
+# DATABASE MIGRATIONS
+# ============================================
+output "codebuild_project_name" {
+  description = "CodeBuild project name for database migrations"
+  value       = module.codebuild.project_name
+}
+
+output "codebuild_project_arn" {
+  description = "CodeBuild project ARN"
+  value       = module.codebuild.project_arn
+}

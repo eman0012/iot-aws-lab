@@ -1,4 +1,9 @@
 # ============================================
+# DATA SOURCES
+# ============================================
+data "aws_caller_identity" "current" {}
+
+# ============================================
 # P0: CORE INFRASTRUCTURE
 # ============================================
 
@@ -78,6 +83,24 @@ module "iot_core" {
   source       = "./modules/iot-core"
   project_name = var.project_name
   environment  = var.environment
+}
+
+# ============================================
+# DATABASE MIGRATIONS (CodeBuild in VPC)
+# ============================================
+module "codebuild" {
+  source                = "./modules/codebuild"
+  project_name          = var.project_name
+  environment           = var.environment
+  aws_region            = var.aws_region
+  account_id            = data.aws_caller_identity.current.account_id
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  rds_endpoint          = module.rds.address
+  rds_security_group_id = module.rds.security_group_id
+  db_name               = var.db_name
+  secrets_arn           = module.secrets.secret_arn
+  github_repo_url       = var.github_repo_url
 }
 
 # ============================================

@@ -1,0 +1,92 @@
+# ============================================
+# AWS CodeBuild Buildspec for Database Migrations
+# ============================================
+# This file defines how CodeBuild runs Alembic migrations.
+# CodeBuild runs inside the VPC with access to private RDS.
+#
+# Trigger via:
+#   aws codebuild start-build --project-name iot-lab-dev-db-migrate
+#
+# Or via GitHub Actions (see .github/workflows/terraform.yml)
+# ============================================
+
+version: 0.2
+
+env:
+  variables:
+    PYTHONUNBUFFERED: "1"
+  secrets-manager:
+    DB_USER: "${SECRETS_ARN}:db_username"
+    DB_PASSWORD: "${SECRETS_ARN}:db_password"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "Installing migration dependencies..."
+      - pip install --quiet -r migrations/requirements.txt
+
+  pre_build:
+    commands:
+      - echo "Validating database connection..."
+      - |
+        python -c "
+        import psycopg2
+        import os
+        conn = psycopg2.connect(
+            host=os.environ['DB_HOST'].split(':')[0],
+            port=5432,
+            database=os.environ['DB_NAME'],
+            user=os.environ['DB_USER'],
+            password=os.environ['DB_PASSWORD'],
+            sslmode='require'
+        )
+        print('Database connection successful')
+        conn.close()
+        "
+
+  build:
+    commands:
+      - echo "Running Alembic migrations..."
+      - cd migrations
+      - |
+        export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?sslmode=require"
+      - alembic upgrade head
+      - echo "Migration complete. Current revision:"
+      - alembic current
+
+  post_build:
+    commands:
+      - echo "Verifying database schema..."
+      - |
+        python -c "
+        import psycopg2
+        import os
+        conn = psycopg2.connect(
+            host=os.environ['DB_HOST'].split(':')[0],
+            port=5432,
+            database=os.environ['DB_NAME'],
+            user=os.environ['DB_USER'],
+            password=os.environ['DB_PASSWORD'],
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+        ''')
+        tables = [row[0] for row in cursor.fetchall()]
+        print(f'Tables in database: {tables}')
+        cursor.close()
+        conn.close()
+        "
+      - echo "Build completed successfully"
+
+reports:
+  migration-report:
+    files:
+      - "**/*"
+    base-directory: migrations
+    discard-paths: yes

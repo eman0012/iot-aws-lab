@@ -79,3 +79,12 @@ variable "enable_eks" {
   type        = bool
   default     = false
 }
+
+# ============================================
+# CODEBUILD / MIGRATIONS
+# ============================================
+variable "github_repo_url" {
+  description = "GitHub repository URL for CodeBuild source"
+  type        = string
+  default     = "https://github.com/CoryEM/iot-aws-lab.git"
+}

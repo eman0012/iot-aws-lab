@@ -1,0 +1,78 @@
+regions:
+  - ca-central-1
+  - global
+
+blocklist:
+  - "000000000000"  # Placeholder to satisfy requirement
+
+accounts:
+  537124935206:
+    filters:
+      # Protect the Terraform state infrastructure we just created
+      S3Bucket:
+        - type: contains
+          value: "terraform-state"
+      DynamoDBTable:
+        - type: contains
+          value: "terraform-locks"
+      # Protect IAM resources we need
+      IAMUser:
+        - "iot-lab-deployer"
+        - "Ansible"
+      IAMGroup:
+        - "TerraformDeployers"
+      IAMPolicy:
+        - type: contains
+          value: "IoTLabDeployerAccess"
+      IAMUserAccessKey:
+        - type: contains
+          value: "iot-lab-deployer"
+      IAMUserGroupAttachment:
+        - type: contains
+          value: "iot-lab-deployer"
+      # Protect default VPC and its resources
+      EC2VPC:
+        - property: IsDefault
+          value: "true"
+      EC2Subnet:
+        - property: DefaultVPC
+          value: "true"
+      EC2InternetGateway:
+        - property: DefaultVPC
+          value: "true"
+      EC2InternetGatewayAttachment:
+        - property: DefaultVPC
+          value: "true"
+
+resource-types:
+  # Only target these resource types - much safer than targeting everything
+  includes:
+    - S3Bucket
+    - S3Object
+    - RDSInstance
+    - RDSDBSubnetGroup
+    - RDSDBParameterGroup
+    - MQBroker
+    - SecretsManagerSecret
+    - CloudWatchLogsLogGroup
+    - IAMRole
+    - IAMRolePolicy
+    - IAMRolePolicyAttachment
+    - IoTPolicy
+    - IoTTopicRule
+    - EC2VPC
+    - EC2Subnet
+    - EC2RouteTable
+    - EC2RouteTableAssociation
+    - EC2InternetGateway
+    - EC2InternetGatewayAttachment
+    - EC2NATGateway
+    - EC2Address
+    - EC2SecurityGroup
+    - EC2VPCEndpoint
+    - LambdaFunction
+    - LambdaLayer
+    - APIGatewayV2API
+    - APIGatewayV2Stage
+    - APIGatewayV2Integration
+    - APIGatewayV2Route
