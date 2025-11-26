@@ -1,0 +1,1246 @@
+openapi: 3.0.1
+info:
+  title: IoT Accessibility Platform API (AWS)
+  description: |
+    API documentation for AWS Lambda serverless IoT platform.
+
+    **Migration Status from Azure:**
+    - Endpoints marked with [IMPLEMENTED] are fully functional
+    - Endpoints marked with [NOT IMPLEMENTED] are pending development
+    - Endpoints marked with [PARTIAL] have limited functionality
+
+    **Key Differences from Azure:**
+    - Conditions use minValue/maxValue/exactValue (Azure parity)
+    - JWT tokens expire in 24 hours (vs 1 hour in Azure)
+    - Image upload in telemetry not yet implemented
+  version: "1.0.0"
+  contact:
+    name: IoT Lab AWS Migration
+
+servers:
+  - url: https://2oqw0ej9u3.execute-api.ca-central-1.amazonaws.com/api
+    description: AWS API Gateway (Production)
+
+tags:
+  - name: User
+    description: Operations related to user management
+  - name: Admin
+    description: Operations related to admin user management
+  - name: Telemetry
+    description: Operations related to telemetry data
+  - name: Device
+    description: Operations related to device management
+  - name: Authentication
+    description: Operations related to user authentication
+  - name: Conditions
+    description: Operations related to condition management
+  - name: AlertLogs
+    description: Operations related to alert logs
+
+paths:
+  # ============================================
+  # HEALTH CHECK - [NOT IMPLEMENTED]
+  # ============================================
+  /ping:
+    get:
+      summary: Health Check [NOT IMPLEMENTED]
+      tags:
+        - General
+      description: |
+        **STATUS: NOT IMPLEMENTED**
+
+        Health check endpoint to verify server is running.
+        TODO: Add health check Lambda or API Gateway integration.
+      responses:
+        '200':
+          description: Server is running
+        '501':
+          description: Not implemented
+
+  # ============================================
+  # AUTHENTICATION - [IMPLEMENTED]
+  # ============================================
+  /user/login:
+    post:
+      summary: User login [IMPLEMENTED]
+      tags:
+        - Authentication
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Authenticate a user and return a new JWT token.
+        AWS supports login by email OR username (Azure only supports email).
+        JWT expires in 24 hours (Azure: 1 hour).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: User's email address (can also use username)
+                password:
+                  type: string
+                  description: User's password
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  token:
+                    type: string
+                  userId:
+                    type: string
+                  userType:
+                    type: string
+        '400':
+          description: Missing required fields or invalid data
+        '401':
+          description: Invalid email or password
+        '404':
+          description: User not found
+
+  # ============================================
+  # USER MANAGEMENT - [IMPLEMENTED]
+  # ============================================
+  /user:
+    post:
+      summary: Create a new user [IMPLEMENTED]
+      tags:
+        - User
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Register a new user account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                name:
+                  type: string
+                surname:
+                  type: string
+                address:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                emergency_contact:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - name
+                - surname
+                - email
+                - password
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  token:
+                    type: string
+                  userId:
+                    type: string
+        '400':
+          description: Missing required fields
+        '409':
+          description: User already exists
+
+    get:
+      summary: Get user details [IMPLEMENTED]
+      tags:
+        - User
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Retrieve the authenticated user's profile with their devices.
+      responses:
+        '200':
+          description: User details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: User not found
+
+    put:
+      summary: Update user information [IMPLEMENTED]
+      tags:
+        - User
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Update user profile information.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                name:
+                  type: string
+                surname:
+                  type: string
+                address:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                emergencyContact:
+                  type: string
+      responses:
+        '200':
+          description: User updated successfully
+        '400':
+          description: No update data provided
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: User not found
+
+    patch:
+      summary: Update user password [IMPLEMENTED]
+      tags:
+        - User
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Change user password (requires old password verification).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: User's email address
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+              required:
+                - email
+                - oldPassword
+                - newPassword
+      responses:
+        '200':
+          description: Password updated successfully
+        '400':
+          description: Missing required fields
+        '401':
+          description: Old password does not match
+        '404':
+          description: User not found
+
+    delete:
+      summary: Delete a user [IMPLEMENTED]
+      tags:
+        - User
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Delete user account and all associated data (devices, telemetry).
+      responses:
+        '200':
+          description: User deleted successfully
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: User not found
+
+  # ============================================
+  # DEVICE MANAGEMENT - [IMPLEMENTED]
+  # ============================================
+  /device:
+    post:
+      summary: Register a new device [PARTIAL]
+      tags:
+        - Device
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: PARTIAL**
+
+        Register a new IoT device.
+
+        **Implemented:**
+        - Device stored in PostgreSQL
+        - Associated with authenticated user
+
+        **NOT Implemented (vs Azure):**
+        - IoT Core device registry integration
+        - SAS token generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                  description: Unique identifier for the device
+                deviceName:
+                  type: string
+                  description: Name of the device
+                sensorType:
+                  type: string
+                  description: Type of sensor (e.g., Temperature, Humidity)
+                location:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    longitude:
+                      type: string
+                    latitude:
+                      type: string
+                status:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      valueType:
+                        type: string
+                      value:
+                        type: integer
+              required:
+                - deviceId
+                - deviceName
+                - sensorType
+                - location
+      responses:
+        '201':
+          description: Device registered successfully
+        '400':
+          description: Missing required fields
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '409':
+          description: Device already exists
+
+    put:
+      summary: Update a device [IMPLEMENTED]
+      tags:
+        - Device
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Update device information.
+      parameters:
+        - name: deviceId
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceName:
+                  type: string
+                sensorType:
+                  type: string
+                location:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    longitude:
+                      type: string
+                    latitude:
+                      type: string
+                status:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      valueType:
+                        type: string
+                      value:
+                        type: string
+      responses:
+        '200':
+          description: Device updated successfully
+        '400':
+          description: Missing required fields
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: Device not found
+
+    delete:
+      summary: Delete a device [PARTIAL]
+      tags:
+        - Device
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: PARTIAL**
+
+        Delete a device.
+
+        **Implemented:**
+        - Device removed from PostgreSQL
+
+        **NOT Implemented (vs Azure):**
+        - IoT Core device registry cleanup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+              required:
+                - deviceId
+      responses:
+        '200':
+          description: Device deleted successfully
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: Device not found
+
+  /devices:
+    get:
+      summary: Get devices [IMPLEMENTED]
+      tags:
+        - Device
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Retrieve user's devices. Supports filtering by deviceId.
+      parameters:
+        - name: deviceId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: deviceName
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sensorType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: location
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of devices retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+        '401':
+          description: Unauthorized (missing or invalid token)
+        '404':
+          description: Device not found
+
+  # ============================================
+  # TELEMETRY - [PARTIAL]
+  # ============================================
+  /telemetry:
+    post:
+      summary: Add telemetry data [PARTIAL]
+      tags:
+        - Telemetry
+      description: |
+        **STATUS: PARTIAL**
+
+        Submit telemetry data for a device. Returns 202 (Accepted) as data is queued for async processing.
+
+        **Implemented:**
+        - JSON telemetry submission
+        - RabbitMQ queue for async processing
+        - Condition evaluation in consumer
+
+        **NOT Implemented (vs Azure):**
+        - Multipart form-data with image upload
+        - Image storage in S3
+        - Image analysis with Rekognition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceId:
+                  type: string
+                  description: Unique identifier for the device
+                temperature:
+                  type: number
+                humidity:
+                  type: number
+                pressure:
+                  type: number
+                lightLevel:
+                  type: number
+                motionDetected:
+                  type: boolean
+                soundLevel:
+                  type: number
+                airQuality:
+                  type: number
+                batteryLevel:
+                  type: number
+              required:
+                - deviceId
+          # NOT YET IMPLEMENTED:
+          # multipart/form-data:
+          #   schema:
+          #     type: object
+          #     properties:
+          #       deviceId:
+          #         type: string
+          #       values:
+          #         type: array
+          #       image:
+          #         type: string
+          #         format: binary
+      responses:
+        '202':
+          description: Telemetry data queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  telemetryId:
+                    type: string
+                  timestamp:
+                    type: string
+        '400':
+          description: Missing required fields or invalid data
+        '404':
+          description: Device not found
+
+    get:
+      summary: Get telemetry data [IMPLEMENTED]
+      tags:
+        - Telemetry
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Retrieve telemetry history for a device.
+      parameters:
+        - name: deviceId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Telemetry data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  telemetry:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Telemetry'
+                  count:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '400':
+          description: Missing deviceId
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '403':
+          description: Device not owned by user
+
+    delete:
+      summary: Delete telemetry data [IMPLEMENTED]
+      tags:
+        - Telemetry
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Delete a specific telemetry record.
+      parameters:
+        - name: telemetryId
+          in: query
+          schema:
+            type: string
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Telemetry data deleted successfully
+        '400':
+          description: Missing required fields
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: Telemetry data not found
+
+  # ============================================
+  # CONDITIONS - [IMPLEMENTED]
+  # ============================================
+  /conditions:
+    get:
+      summary: Get conditions [IMPLEMENTED]
+      tags:
+        - Conditions
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Retrieve alert conditions for the authenticated user.
+      parameters:
+        - name: deviceId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of conditions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Condition'
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+
+    post:
+      summary: Create condition(s) [IMPLEMENTED]
+      tags:
+        - Conditions
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Create one or multiple alert conditions.
+
+        **Condition Model (Azure Parity):**
+        - Uses minValue/maxValue/exactValue thresholds
+        - Supports scope: general, user, device
+        - Notification methods: Log, Notification, Email, SMS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/ConditionCreate'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/ConditionCreate'
+      responses:
+        '201':
+          description: Conditions created successfully
+        '400':
+          description: Invalid request body or validation errors
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+
+    put:
+      summary: Update a condition [IMPLEMENTED]
+      tags:
+        - Conditions
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Update an existing alert condition.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conditionId:
+                  type: string
+                valueType:
+                  type: string
+                minValue:
+                  type: number
+                maxValue:
+                  type: number
+                exactValue:
+                  type: number
+                unit:
+                  type: string
+                scope:
+                  type: string
+                  enum: [general, user, device]
+                notificationMethods:
+                  type: array
+                  items:
+                    type: string
+                    enum: [Log, Notification, Email, SMS]
+              required:
+                - conditionId
+      responses:
+        '200':
+          description: Condition updated successfully
+        '400':
+          description: Missing required fields
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: Condition not found
+
+    delete:
+      summary: Delete a condition [IMPLEMENTED]
+      tags:
+        - Conditions
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Delete an alert condition.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conditionId:
+                  type: string
+              required:
+                - conditionId
+      responses:
+        '200':
+          description: Condition deleted successfully
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: Condition not found
+
+  # ============================================
+  # ALERT LOGS - [IMPLEMENTED]
+  # ============================================
+  /alertlogs:
+    get:
+      summary: Get Alert Logs [IMPLEMENTED]
+      tags:
+        - AlertLogs
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Retrieve alert logs for the authenticated user.
+      parameters:
+        - name: deviceId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of alert logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertLog'
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+
+    delete:
+      summary: Delete an Alert Log [IMPLEMENTED]
+      tags:
+        - AlertLogs
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Delete a specific alert log.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alertLogId:
+                  type: string
+              required:
+                - alertLogId
+      responses:
+        '200':
+          description: Alert log deleted successfully
+        '401':
+          description: Unauthorized (JWT token missing or invalid)
+        '404':
+          description: Alert log not found
+
+  # ============================================
+  # ADMIN - [PARTIAL]
+  # ============================================
+  /manage/users:
+    get:
+      summary: Get all users (Admin only) [IMPLEMENTED]
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Retrieve all users. Admin access required.
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: username
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized (missing or invalid token)
+        '403':
+          description: Forbidden (only admins can access)
+
+  /manage/change-user-type:
+    put:
+      summary: Change user type (Admin only) [IMPLEMENTED]
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Change a user's role (admin/user). Admin access required.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: userType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [user, admin]
+      responses:
+        '200':
+          description: User type updated successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Access denied (only admins)
+        '404':
+          description: User not found
+
+  /manage/create-admin:
+    post:
+      summary: Create admin user [NOT IMPLEMENTED]
+      tags:
+        - Admin
+      description: |
+        **STATUS: NOT IMPLEMENTED**
+
+        Create a new admin user without authentication.
+        Used for initial system bootstrap.
+
+        TODO: Implement this endpoint for first-time setup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                name:
+                  type: string
+                surname:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - name
+                - surname
+                - email
+                - password
+      responses:
+        '201':
+          description: Admin user created successfully
+        '501':
+          description: Not implemented
+
+  /manage/processed-images:
+    get:
+      summary: List processed images (Admin only) [NOT IMPLEMENTED]
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: NOT IMPLEMENTED**
+
+        List processed images from S3 with presigned URLs.
+
+        **Azure Features (not yet in AWS):**
+        - List all files in processed-images bucket
+        - Search by image name
+        - Generate SAS/presigned URLs
+
+        TODO: Implement S3 listing with presigned URLs.
+      parameters:
+        - name: prefix
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: imageName
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: deviceId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Images listed successfully
+        '501':
+          description: Not implemented
+
+  /manage/transfer-device:
+    post:
+      summary: Transfer device between users (Admin only) [IMPLEMENTED]
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      description: |
+        **STATUS: IMPLEMENTED**
+
+        Transfer device ownership from one user to another. Admin access required.
+      parameters:
+        - name: deviceId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: newUserId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device transferred successfully
+        '400':
+          description: Missing required parameters
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (only admins)
+        '404':
+          description: Device or user not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /user/login
+
+  schemas:
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        name:
+          type: string
+        surname:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        emergencyContact:
+          type: string
+        type:
+          type: string
+          enum: [user, admin]
+        Devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+
+    Device:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        deviceName:
+          type: string
+        sensorType:
+          type: string
+        location:
+          type: object
+          properties:
+            name:
+              type: string
+            longitude:
+              type: string
+            latitude:
+              type: string
+        registrationDate:
+          type: string
+          format: date-time
+        status:
+          type: array
+          items:
+            type: object
+            properties:
+              valueType:
+                type: string
+              value:
+                type: string
+
+    Telemetry:
+      type: object
+      properties:
+        eventId:
+          type: string
+        deviceId:
+          type: string
+        event_date:
+          type: string
+          format: date-time
+        values:
+          type: array
+          items:
+            type: object
+            properties:
+              valueType:
+                type: string
+              value:
+                type: number
+              longitude:
+                type: string
+              latitude:
+                type: string
+        imageUrl:
+          type: string
+          description: URL of associated image (if any)
+
+    Condition:
+      type: object
+      properties:
+        conditionId:
+          type: string
+        userId:
+          type: string
+        deviceId:
+          type: string
+        valueType:
+          type: string
+          description: Type of sensor value (e.g., temperature, humidity)
+        minValue:
+          type: number
+          description: Alert if value falls below this
+        maxValue:
+          type: number
+          description: Alert if value exceeds this
+        exactValue:
+          type: number
+          description: Alert if value equals this exactly
+        unit:
+          type: string
+        scope:
+          type: string
+          enum: [general, user, device]
+        notificationMethods:
+          type: array
+          items:
+            type: string
+            enum: [Log, Notification, Email, SMS]
+
+    ConditionCreate:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          description: Optional - for device-specific conditions
+        valueType:
+          type: string
+          description: Type of sensor value (e.g., temperature, humidity)
+        minValue:
+          type: number
+        maxValue:
+          type: number
+        exactValue:
+          type: number
+        unit:
+          type: string
+        scope:
+          type: string
+          enum: [general, user, device]
+        notificationMethods:
+          type: array
+          items:
+            type: string
+            enum: [Log, Notification, Email, SMS]
+      required:
+        - valueType
+
+    AlertLog:
+      type: object
+      properties:
+        alertLogId:
+          type: string
+        deviceId:
+          type: string
+        userId:
+          type: string
+        message:
+          type: string
+        condition:
+          $ref: '#/components/schemas/Condition'
+        telemetry_data:
+          type: array
+          items:
+            type: object
+            properties:
+              valueType:
+                type: string
+              value:
+                type: number
+              longitude:
+                type: string
+              latitude:
+                type: string
+        timestamp:
+          type: string
+          format: date-time
