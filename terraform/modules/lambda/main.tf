@@ -98,7 +98,10 @@ resource "aws_lambda_layer_version" "shared" {
 
 # Lambda Functions
 locals {
+  # API-triggered functions
   lambda_functions = ["users", "devices", "telemetry", "conditions", "alertlogs", "admin"]
+  # Background consumer functions (triggered by CloudWatch Events)
+  consumer_functions = ["consumers"]
 }
 
 resource "aws_lambda_function" "functions" {
@@ -255,4 +258,74 @@ resource "aws_apigatewayv2_route" "routes" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = each.value.route_key
   target    = "integrations/${each.value.integration_id}"
+}
+
+# ============================================
+# RABBITMQ CONSUMER LAMBDA
+# ============================================
+# Separate Lambda for processing RabbitMQ messages
+# Triggered by CloudWatch Events on a schedule
+
+resource "aws_lambda_function" "consumer" {
+  filename         = "${path.module}/../../../lambda/build/consumers.zip"
+  function_name    = "${var.project_name}-${var.environment}-consumer"
+  role             = aws_iam_role.lambda_exec.arn
+  handler          = "handler.main"
+  source_code_hash = fileexists("${path.module}/../../../lambda/build/consumers.zip") ? filebase64sha256("${path.module}/../../../lambda/build/consumers.zip") : ""
+  runtime          = "python3.10"
+  timeout          = 60 # Longer timeout for batch processing
+  memory_size      = 512
+
+  layers = [aws_lambda_layer_version.shared.arn]
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
+  environment {
+    variables = {
+      SECRETS_ARN   = var.secrets_arn
+      DB_HOST       = var.rds_endpoint
+      DB_NAME       = var.rds_db_name
+      RABBITMQ_HOST = var.rabbitmq_endpoint
+      S3_BUCKET     = var.s3_bucket_name
+      QUEUE_NAME    = "telemetry-queue"
+      ENVIRONMENT   = var.environment
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [source_code_hash]
+  }
+
+  tags = {
+    Name    = "${var.project_name}-${var.environment}-consumer"
+    Purpose = "RabbitMQ message consumer"
+  }
+}
+
+# CloudWatch Events Rule - triggers consumer every minute
+resource "aws_cloudwatch_event_rule" "consumer_schedule" {
+  name                = "${var.project_name}-${var.environment}-consumer-schedule"
+  description         = "Triggers RabbitMQ consumer Lambda every minute"
+  schedule_expression = "rate(1 minute)"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-consumer-schedule"
+  }
+}
+
+resource "aws_cloudwatch_event_target" "consumer_target" {
+  rule      = aws_cloudwatch_event_rule.consumer_schedule.name
+  target_id = "ConsumerLambda"
+  arn       = aws_lambda_function.consumer.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.consumer.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.consumer_schedule.arn
 }

@@ -3,7 +3,14 @@ output "api_gateway_url" {
 }
 
 output "function_names" {
-  value = [for f in aws_lambda_function.functions : f.function_name]
+  value = concat(
+    [for f in aws_lambda_function.functions : f.function_name],
+    [aws_lambda_function.consumer.function_name]
+  )
+}
+
+output "consumer_function_name" {
+  value = aws_lambda_function.consumer.function_name
 }
 
 output "security_group_id" {

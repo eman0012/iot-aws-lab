@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build"
-FUNCTIONS=("users" "devices" "telemetry" "conditions" "alertlogs" "admin")
+FUNCTIONS=("users" "devices" "telemetry" "conditions" "alertlogs" "admin" "consumers")
 
 echo "🔨 Building Lambda packages..."
 
