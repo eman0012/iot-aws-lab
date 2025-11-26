@@ -1,27 +1,39 @@
 # ============================================
 # SECURITY GROUP
 # ============================================
+# Note: Using separate aws_security_group_rule resources instead of inline
+# rules to allow other modules (like CodeBuild) to add rules without conflict.
 resource "aws_security_group" "rds" {
   name_prefix = "${var.project_name}-rds-"
   vpc_id      = var.vpc_id
-
-  ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = var.allowed_sg_ids
-    description     = "PostgreSQL from allowed security groups"
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  description = "Security group for RDS PostgreSQL"
 
   tags = { Name = "${var.project_name}-${var.environment}-rds-sg" }
   lifecycle { create_before_destroy = true }
+}
+
+# Ingress rules for allowed security groups (Lambda, etc.)
+resource "aws_security_group_rule" "rds_ingress" {
+  for_each = toset(var.allowed_sg_ids)
+
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.rds.id
+  source_security_group_id = each.value
+  description              = "PostgreSQL from allowed security groups"
+}
+
+# Egress rule
+resource "aws_security_group_rule" "rds_egress" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.rds.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Allow all outbound"
 }
 
 # ============================================
