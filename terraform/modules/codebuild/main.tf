@@ -96,13 +96,18 @@ resource "aws_iam_role_policy" "codebuild" {
         }
       },
       {
-        # S3 access for source code (if using S3 source)
+        # S3 access for migration artifacts
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:GetObjectVersion"
+          "s3:GetObjectVersion",
+          "s3:GetBucketLocation",
+          "s3:ListBucket"
         ]
-        Resource = "arn:aws:s3:::${var.project_name}-*/*"
+        Resource = [
+          var.artifacts_bucket_arn,
+          "${var.artifacts_bucket_arn}/*"
+        ]
       }
     ]
   })
@@ -196,9 +201,9 @@ resource "aws_codebuild_project" "db_migrate" {
   }
 
   source {
-    type      = "GITHUB"
-    location  = var.github_repo_url
-    buildspec = "migrations/buildspec.yml"
+    type      = "S3"
+    location  = "${var.artifacts_bucket_name}/migrations.zip"
+    buildspec = "buildspec.yml"
   }
 
   vpc_config {

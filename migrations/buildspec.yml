@@ -4,10 +4,8 @@
 # This file defines how CodeBuild runs Alembic migrations.
 # CodeBuild runs inside the VPC with access to private RDS.
 #
-# Trigger via:
-#   aws codebuild start-build --project-name iot-lab-dev-db-migrate
-#
-# Or via GitHub Actions (see .github/workflows/terraform.yml)
+# Source: S3 bucket (migrations.zip uploaded by GitHub Actions)
+# Trigger: GitHub Actions after Terraform apply
 # ============================================
 
 version: 0.2
@@ -25,7 +23,7 @@ phases:
       python: 3.11
     commands:
       - echo "Installing migration dependencies..."
-      - pip install --quiet -r migrations/requirements.txt
+      - pip install --quiet -r requirements.txt
 
   pre_build:
     commands:
@@ -49,9 +47,7 @@ phases:
   build:
     commands:
       - echo "Running Alembic migrations..."
-      - cd migrations
-      - |
-        export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?sslmode=require"
+      - export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?sslmode=require"
       - alembic upgrade head
       - echo "Migration complete. Current revision:"
       - alembic current
@@ -83,10 +79,3 @@ phases:
         conn.close()
         "
       - echo "Build completed successfully"
-
-reports:
-  migration-report:
-    files:
-      - "**/*"
-    base-directory: migrations
-    discard-paths: yes

@@ -88,6 +88,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -95,13 +97,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Get Artifacts Bucket Name
+        id: bucket
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "name=iot-lab-dev-artifacts-${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+
+      - name: Package and Upload Migrations to S3
+        run: |
+          echo "Packaging migrations..."
+          cd migrations
+          zip -r ../migrations.zip .
+          cd ..
+
+          echo "Uploading to S3..."
+          aws s3 cp migrations.zip s3://${{ steps.bucket.outputs.name }}/migrations.zip
+          echo "Upload complete!"
+
       - name: Trigger CodeBuild Migration
         id: codebuild
         run: |
           echo "Starting CodeBuild migration job..."
           BUILD_ID=$(aws codebuild start-build \
             --project-name iot-lab-dev-db-migrate \
-            --source-version main \
             --query 'build.id' \
             --output text)
           echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT

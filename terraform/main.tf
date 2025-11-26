@@ -100,7 +100,8 @@ module "codebuild" {
   rds_security_group_id = module.rds.security_group_id
   db_name               = var.db_name
   secrets_arn           = module.secrets.secret_arn
-  github_repo_url       = var.github_repo_url
+  artifacts_bucket_name = module.s3.artifacts_bucket_name
+  artifacts_bucket_arn  = module.s3.artifacts_bucket_arn
 }
 
 # ============================================

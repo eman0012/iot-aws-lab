@@ -52,8 +52,12 @@ variable "secrets_arn" {
   type        = string
 }
 
-variable "github_repo_url" {
-  description = "GitHub repository URL"
+variable "artifacts_bucket_name" {
+  description = "S3 bucket for migration artifacts"
   type        = string
-  default     = "https://github.com/your-username/iot-aws-lab.git"
+}
+
+variable "artifacts_bucket_arn" {
+  description = "S3 bucket ARN for migration artifacts"
+  type        = string
 }
